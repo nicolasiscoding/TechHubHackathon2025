@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Search, Navigation, Menu, X, MapPin, Clock } from "lucide-react"
+import { Search, Navigation, Menu, X, MapPin, Clock, MoreVertical, Car, Bike, Users, AlertTriangle } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { motion, AnimatePresence } from "framer-motion"
@@ -12,16 +12,29 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { routeAPI, RouteResponse } from "@/lib/api"
 
 interface SearchBarProps {
   onSearch: (query: string) => void
   onNavigate: (destination: string) => void
   onMenuClick?: () => void
+  onRouteCalculated?: (route: RouteResponse) => void
+  userLocation?: { lat: number; lng: number }
 }
 
-export default function SearchBar({ onSearch, onNavigate, onMenuClick }: SearchBarProps) {
+export default function SearchBar({ onSearch, onNavigate, onMenuClick, onRouteCalculated, userLocation }: SearchBarProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [isSearchFocused, setIsSearchFocused] = useState(false)
+  const [transportMode, setTransportMode] = useState<'auto' | 'bicycle' | 'pedestrian'>('auto')
+  const [isCalculatingRoute, setIsCalculatingRoute] = useState(false)
   const [recentSearches, setRecentSearches] = useState<string[]>([
     "Home",
     "Work",
@@ -43,10 +56,99 @@ export default function SearchBar({ onSearch, onNavigate, onMenuClick }: SearchB
     }
   }
 
+  const handleNavigate = async () => {
+    if (!searchQuery.trim() || !userLocation) {
+      onNavigate(searchQuery)
+      return
+    }
+
+    // Use intelligent routing with incident avoidance
+    setIsCalculatingRoute(true)
+    try {
+      // For demo, use fixed coordinates for common destinations
+      const destinationCoords = getDestinationCoords(searchQuery)
+
+      if (destinationCoords) {
+        const routeRequest = {
+          start: { lat: userLocation.lat, lon: userLocation.lng },
+          end: destinationCoords,
+          costing: transportMode,
+          avoid_incidents: true,
+          buffer_km: 2
+        }
+
+        const route = await routeAPI.calculateRoute(routeRequest)
+
+        if (onRouteCalculated) {
+          onRouteCalculated(route)
+        }
+
+        // Add to recent searches
+        setRecentSearches(prev => {
+          const updated = [searchQuery, ...prev.filter(s => s !== searchQuery)]
+          return updated.slice(0, 5)
+        })
+
+        console.log(`🛣️ Calculated ${transportMode} route: ${route.optimal_route.summary.distance_miles} miles, ${route.optimal_route.summary.duration_minutes} min`)
+        if (route.avoided_incidents > 0) {
+          console.log(`🚧 Avoided ${route.avoided_incidents} incidents!`)
+        }
+      } else {
+        // Try to geocode the address or fallback to regular search
+        console.log(`⚠️ Address "${searchQuery}" not in demo destinations. Add geocoding for full address support.`)
+        alert(`Demo supports: Miami, Fort Lauderdale, Boca Raton, West Palm Beach, Home, Work. For "${searchQuery}", we'd need geocoding integration.`)
+        onNavigate(searchQuery)
+      }
+
+      setSearchQuery("")
+      searchRef.current?.blur()
+    } catch (error: any) {
+      console.error('Route calculation failed:', error)
+
+      // Show user-friendly error message
+      if (error.message?.includes('503') || error.message?.includes('unavailable')) {
+        alert('⚠️ The routing service is temporarily unavailable due to high load. Please try again in a few moments.')
+      } else {
+        alert(`❌ Route calculation failed. Please try again later.`)
+      }
+
+      // Fallback to regular navigation
+      onNavigate(searchQuery)
+    } finally {
+      setIsCalculatingRoute(false)
+    }
+  }
+
+  const getDestinationCoords = (query: string): { lat: number; lon: number } | null => {
+    const normalizedQuery = query.toLowerCase().trim()
+
+    // Common Florida destinations for demo
+    const destinations: Record<string, { lat: number; lon: number }> = {
+      'west palm beach': { lat: 26.7153, lon: -80.0534 },
+      'palm beach': { lat: 26.7153, lon: -80.0534 },
+      'fort lauderdale': { lat: 26.1224, lon: -80.1373 },
+      'boca raton': { lat: 26.3683, lon: -80.1289 },
+      'miami': { lat: 25.7617, lon: -80.1918 },
+      'downtown miami': { lat: 25.7617, lon: -80.1918 },
+      'home': { lat: 26.7153, lon: -80.0534 }, // Default to West Palm Beach
+      'work': { lat: 26.1224, lon: -80.1373 }, // Default to Fort Lauderdale
+    }
+
+    return destinations[normalizedQuery] || null
+  }
+
   const handleQuickSearch = (query: string) => {
     setSearchQuery(query)
-    onNavigate(query)
+    handleNavigate()
     setIsSearchFocused(false)
+  }
+
+  const getTransportIcon = () => {
+    switch (transportMode) {
+      case 'auto': return <Car className="h-4 w-4" />
+      case 'bicycle': return <Bike className="h-4 w-4" />
+      case 'pedestrian': return <Users className="h-4 w-4" />
+    }
   }
 
   return (
@@ -156,16 +258,72 @@ export default function SearchBar({ onSearch, onNavigate, onMenuClick }: SearchB
               </motion.div>
             </div>
 
-            {/* Navigate Button */}
+            {/* Navigate Button with Loading State */}
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
               <Button
                 size="icon"
-                onClick={() => onNavigate(searchQuery)}
-                className="flex-shrink-0 h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 shadow-lg border-0"
+                onClick={handleNavigate}
+                disabled={isCalculatingRoute}
+                className="flex-shrink-0 h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 shadow-lg border-0 disabled:opacity-50"
               >
-                <Navigation className="h-5 w-5" />
+                {isCalculatingRoute ? (
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  >
+                    <Search className="h-5 w-5" />
+                  </motion.div>
+                ) : (
+                  <Navigation className="h-5 w-5" />
+                )}
               </Button>
             </motion.div>
+
+            {/* 3-Dot Options Menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="flex-shrink-0 h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-white/50 dark:bg-gray-800/50 hover:bg-white/70 dark:hover:bg-gray-800/70 border border-white/20 dark:border-gray-700/30"
+                  >
+                    <MoreVertical className="h-5 w-5" />
+                  </Button>
+                </motion.div>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border border-white/20 dark:border-gray-700/30">
+                <DropdownMenuLabel className="flex items-center gap-2">
+                  {getTransportIcon()}
+                  Transport Mode
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => setTransportMode('auto')}
+                  className={`flex items-center gap-2 ${transportMode === 'auto' ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}
+                >
+                  <Car className="h-4 w-4" />
+                  Driving
+                  {transportMode === 'auto' && <span className="ml-auto text-blue-500">✓</span>}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setTransportMode('bicycle')}
+                  className={`flex items-center gap-2 ${transportMode === 'bicycle' ? 'bg-green-50 dark:bg-green-900/20' : ''}`}
+                >
+                  <Bike className="h-4 w-4" />
+                  Cycling
+                  {transportMode === 'bicycle' && <span className="ml-auto text-green-500">✓</span>}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setTransportMode('pedestrian')}
+                  className={`flex items-center gap-2 ${transportMode === 'pedestrian' ? 'bg-purple-50 dark:bg-purple-900/20' : ''}`}
+                >
+                  <Users className="h-4 w-4" />
+                  Walking
+                  {transportMode === 'pedestrian' && <span className="ml-auto text-purple-500">✓</span>}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 

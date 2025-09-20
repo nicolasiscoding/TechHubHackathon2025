@@ -16,19 +16,24 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 
 interface IncidentReportModalProps {
-  onReportIncident: (incident: {
+  isOpen: boolean
+  onClose: () => void
+  onSubmit: (incident: {
     type: string
     description: string
     location?: { lat: number; lng: number }
   }) => void
+  onOpenModal: () => void
   currentLocation?: { lat: number; lng: number }
 }
 
 export default function IncidentReportModal({
-  onReportIncident,
+  isOpen,
+  onClose,
+  onSubmit,
+  onOpenModal,
   currentLocation
 }: IncidentReportModalProps) {
-  const [isOpen, setIsOpen] = useState(false)
   const [step, setStep] = useState(1) // 1 = select type, 2 = add description
   const [incidentType, setIncidentType] = useState("")
   const [description, setDescription] = useState("")
@@ -52,7 +57,7 @@ export default function IncidentReportModal({
 
   const handleSubmit = () => {
     if (incidentType && description) {
-      onReportIncident({
+      onSubmit({
         type: incidentType,
         description,
         location: currentLocation,
@@ -61,12 +66,11 @@ export default function IncidentReportModal({
       setIncidentType("")
       setDescription("")
       setStep(1)
-      setIsOpen(false)
     }
   }
 
   const handleClose = () => {
-    setIsOpen(false)
+    onClose()
     setStep(1)
     setIncidentType("")
     setDescription("")
@@ -100,7 +104,7 @@ export default function IncidentReportModal({
 
           <Button
             size="lg"
-            onClick={() => setIsOpen(true)}
+            onClick={onOpenModal}
             className="w-12 h-12 sm:w-14 sm:h-14 rounded-full shadow-2xl bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 border-2 border-white/20 backdrop-blur-sm relative"
           >
             <Plus className="h-5 w-5 sm:h-6 sm:w-6" />

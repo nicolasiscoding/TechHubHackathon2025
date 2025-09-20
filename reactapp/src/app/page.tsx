@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import dynamic from "next/dynamic"
 import SearchBar from "@/components/SearchBar"
 import IncidentReportModal from "@/components/IncidentReportModal"
-import RouteCalculator from "@/components/RouteCalculator"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import { incidentAPI, Incident, RouteResponse } from "@/lib/api"
 
@@ -27,6 +26,7 @@ export default function Home() {
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | undefined>()
   const [isLoading, setIsLoading] = useState(true)
   const [currentRoute, setCurrentRoute] = useState<RouteResponse | null>(null)
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false)
 
   useEffect(() => {
     // Get user's current location
@@ -74,7 +74,7 @@ export default function Home() {
     // This would typically calculate a route and display it on the map
   }
 
-  const handleReportIncident = async (incidentData: {
+  const handleIncidentSubmit = async (incidentData: {
     type: string
     description: string
     location?: { lat: number; lng: number }
@@ -90,6 +90,7 @@ export default function Home() {
       // Add to local state for immediate UI update
       setIncidents(prev => [...prev, newIncident])
       console.log("New incident reported:", newIncident)
+      setIsReportModalOpen(false)
     } catch (error) {
       console.error("Failed to report incident:", error)
       alert("Failed to report incident. Please try again.")
@@ -106,25 +107,24 @@ export default function Home() {
       {/* Beautiful Map View */}
       <BeautifulMapView incidents={incidents} userLocation={userLocation} currentRoute={currentRoute} />
 
-      {/* Search Bar */}
+      {/* Enhanced Search Bar with Intelligent Routing */}
       <SearchBar
         onSearch={handleSearch}
         onNavigate={handleNavigate}
+        onRouteCalculated={handleRouteCalculated}
+        userLocation={userLocation}
       />
 
       {/* Theme Toggle */}
       <ThemeToggle />
 
-      {/* Incident Report Button */}
+      {/* Incident Report Modal */}
       <IncidentReportModal
-        onReportIncident={handleReportIncident}
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        onSubmit={handleIncidentSubmit}
+        onOpenModal={() => setIsReportModalOpen(true)}
         currentLocation={userLocation}
-      />
-
-      {/* Route Calculator */}
-      <RouteCalculator
-        onRouteCalculated={handleRouteCalculated}
-        userLocation={userLocation}
       />
 
       {/* Loading overlay */}

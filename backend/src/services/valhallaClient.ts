@@ -89,6 +89,10 @@ export class ValhallaClient {
       // Throttle request to respect rate limits
       await this.throttleRequest();
 
+      // Add AbortController for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
       const response = await fetch(`${this.baseUrl}/route`, {
         method: 'POST',
         headers: {
@@ -101,9 +105,13 @@ export class ValhallaClient {
             ...request.directions_options,
           },
         }),
+        signal: controller.signal,
       });
 
+      clearTimeout(timeoutId);
+
       if (!response.ok) {
+        console.error(`Valhalla API error: ${response.status} ${response.statusText}`);
         throw new Error(`Valhalla API error: ${response.status} ${response.statusText}`);
       }
 
@@ -169,8 +177,25 @@ export class ValhallaClient {
         baseline: baselineRoute,
         avoided_incidents: exclusions.length,
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error calculating route options:', error);
+
+      // If Valhalla is having issues, try a simpler approach
+      if (error.message?.includes('504') || error.message?.includes('timeout')) {
+        console.log('⚠️ Valhalla timeout - trying simple route without exclusions...');
+        try {
+          // Just try to get a basic route without any exclusions
+          const simpleRoute = await this.calculateRouteWithExclusions(start, end, [], costing);
+          return {
+            optimal: simpleRoute,
+            baseline: simpleRoute,
+            avoided_incidents: 0,
+          };
+        } catch (fallbackError) {
+          console.error('Fallback route also failed:', fallbackError);
+        }
+      }
+
       throw error;
     }
   }

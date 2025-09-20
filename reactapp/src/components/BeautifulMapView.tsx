@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import Map, { Marker, Popup, NavigationControl, GeolocateControl } from "react-map-gl/maplibre"
+import Map, { Marker, Popup, NavigationControl, GeolocateControl, Source, Layer } from "react-map-gl/maplibre"
 import { motion, AnimatePresence } from "framer-motion"
 import "maplibre-gl/dist/maplibre-gl.css"
 
@@ -45,6 +45,47 @@ const incidentConfig = {
   downed_powerline: { color: "#ea580c", icon: "⚠️", label: "Downed Powerline" },
 }
 
+// Decode Valhalla polyline6 format (1e-6 precision)
+const decodePolyline = (encoded: string): [number, number][] => {
+  const coordinates: [number, number][] = []
+  let index = 0
+  let lat = 0
+  let lng = 0
+  const factor = 1e6  // Valhalla uses 1e-6 precision
+
+  while (index < encoded.length) {
+    let shift = 0
+    let result = 0
+    let byte
+
+    do {
+      byte = encoded.charCodeAt(index++) - 63
+      result |= (byte & 0x1f) << shift
+      shift += 5
+    } while (byte >= 0x20)
+
+    const dlat = ((result & 1) ? ~(result >> 1) : (result >> 1))
+    lat += dlat
+
+    shift = 0
+    result = 0
+
+    do {
+      byte = encoded.charCodeAt(index++) - 63
+      result |= (byte & 0x1f) << shift
+      shift += 5
+    } while (byte >= 0x20)
+
+    const dlng = ((result & 1) ? ~(result >> 1) : (result >> 1))
+    lng += dlng
+
+    // Valhalla returns [lng, lat] for GeoJSON compatibility
+    coordinates.push([lng / factor, lat / factor])
+  }
+
+  return coordinates
+}
+
 export default function BeautifulMapView({ incidents, userLocation, currentRoute }: BeautifulMapViewProps) {
   const mapRef = useRef<any>(null)
   const [viewState, setViewState] = useState({
@@ -53,6 +94,7 @@ export default function BeautifulMapView({ incidents, userLocation, currentRoute
     zoom: 12,
   })
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null)
+  const [routeGeometry, setRouteGeometry] = useState<any>(null)
   const [mapLoaded, setMapLoaded] = useState(false)
 
   useEffect(() => {
@@ -68,7 +110,7 @@ export default function BeautifulMapView({ incidents, userLocation, currentRoute
 
   // Handle route visualization
   useEffect(() => {
-    if (currentRoute) {
+    if (currentRoute && currentRoute.optimal_route.geometry) {
       console.log('🗺️ Route received in map component:', currentRoute)
       console.log('📍 Route summary:', {
         distance: `${currentRoute.optimal_route.summary.distance_miles} miles`,
@@ -76,10 +118,45 @@ export default function BeautifulMapView({ incidents, userLocation, currentRoute
         avoided_incidents: currentRoute.avoided_incidents
       })
 
-      // TODO: Add polyline visualization to map
-      // The geometry is encoded polyline format that needs to be decoded
-      if (currentRoute.optimal_route.geometry) {
-        console.log('🛣️ Route geometry available (encoded polyline)')
+      // Decode the polyline geometry
+      const coordinates = decodePolyline(currentRoute.optimal_route.geometry)
+
+      // Create GeoJSON for the route
+      const routeGeoJSON = {
+        type: 'Feature',
+        properties: {},
+        geometry: {
+          type: 'LineString',
+          coordinates: coordinates
+        }
+      }
+
+      setRouteGeometry(routeGeoJSON)
+      console.log('🛣️ Route decoded with', coordinates.length, 'points')
+
+      // Fit map to route bounds
+      if (mapRef.current && coordinates.length > 0) {
+        const bounds = coordinates.reduce(
+          (bounds, coord) => {
+            return {
+              minLng: Math.min(bounds.minLng, coord[0]),
+              minLat: Math.min(bounds.minLat, coord[1]),
+              maxLng: Math.max(bounds.maxLng, coord[0]),
+              maxLat: Math.max(bounds.maxLat, coord[1])
+            }
+          },
+          {
+            minLng: coordinates[0][0],
+            minLat: coordinates[0][1],
+            maxLng: coordinates[0][0],
+            maxLat: coordinates[0][1]
+          }
+        )
+
+        mapRef.current.fitBounds(
+          [[bounds.minLng, bounds.minLat], [bounds.maxLng, bounds.maxLat]],
+          { padding: 50, duration: 1000 }
+        )
       }
 
       if (currentRoute.avoided_incidents > 0) {
@@ -184,6 +261,35 @@ export default function BeautifulMapView({ incidents, userLocation, currentRoute
 
         {/* Geolocate Control */}
         <GeolocateControl position="bottom-right" trackUserLocation />
+
+        {/* Route Layer */}
+        {routeGeometry && mapLoaded && (
+          <Source id="route" type="geojson" data={routeGeometry}>
+            <Layer
+              id="route-line"
+              type="line"
+              paint={{
+                'line-color': '#3b82f6',
+                'line-width': 5,
+                'line-opacity': 0.8
+              }}
+            />
+            <Layer
+              id="route-outline"
+              type="line"
+              paint={{
+                'line-color': '#1e40af',
+                'line-width': 8,
+                'line-opacity': 0.4
+              }}
+              layout={{
+                'line-cap': 'round',
+                'line-join': 'round'
+              }}
+              beforeId="route-line"
+            />
+          </Source>
+        )}
 
         {/* User Location */}
         <UserLocationMarker />

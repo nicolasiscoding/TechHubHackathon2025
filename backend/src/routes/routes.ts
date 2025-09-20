@@ -116,12 +116,22 @@ router.post('/', async (req: Request<{}, RouteCalculationResponse, RouteCalculat
     console.log(`Route calculated: ${response.optimal_route.summary.distance_miles} miles, ${response.optimal_route.summary.duration_minutes} minutes, avoided ${response.avoided_incidents} incidents`);
 
     res.json(response);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error calculating route:', error);
-    res.status(500).json({
-      error: 'Failed to calculate route',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    } as any);
+
+    // Check for timeout/gateway errors from Valhalla
+    if (error.message?.includes('504') || error.message?.includes('timeout') || error.message?.includes('abort')) {
+      res.status(503).json({
+        error: 'Routing service temporarily unavailable',
+        details: 'The Valhalla routing server is experiencing high load. Please try again in a few moments.',
+        suggestion: 'You can also try the simple route endpoint at /api/routes/simple'
+      } as any);
+    } else {
+      res.status(500).json({
+        error: 'Failed to calculate route',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      } as any);
+    }
   }
 });
 
