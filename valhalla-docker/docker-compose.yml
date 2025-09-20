@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  valhalla:
+    image: ghcr.io/gis-ops/docker-valhalla/valhalla:latest
+    container_name: valhalla-routing
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./custom_files:/custom_files
+      - ./valhalla_tiles:/custom_files/valhalla_tiles
+      - ./config:/custom_files/config
+      - ./osm_data:/custom_files/osm_data
+      - valhalla_data:/usr/local/var/valhalla
+    environment:
+      # Use local OSM file instead of downloading
+      - tile_files=/custom_files/osm_data/florida-latest.osm.pbf
+      # Set timezone
+      - TZ=America/New_York
+      # Force rebuild tiles from OSM data
+      - build_tiles=True
+      - force_rebuild=True
+      # Enable verbose logging
+      - verbose=True
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/route"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 300s
+
+volumes:
+  valhalla_data:
+    driver: local

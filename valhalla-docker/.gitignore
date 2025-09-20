@@ -1,0 +1,24 @@
+# OSM Data Files (large binary files)
+osm_data/
+*.osm.pbf
+
+# Valhalla Generated Data
+valhalla_tiles/
+custom_files/valhalla_tiles/
+custom_files/transit_tiles/
+custom_files/valhalla_tiles.tar
+custom_files/file_hashes.txt
+
+# Docker Volumes
+volumes/
+
+# Environment Files
+.env
+
+# Logs
+*.log
+logs/
+
+# Temporary Files
+*.tmp
+temp/
