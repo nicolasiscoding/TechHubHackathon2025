@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { randomUUID } from 'crypto';
 import { Incident, IncidentRequest, ValhallaExclusionResponse } from '../types';
 import { SpatialStorage } from '../services/spatialStorage';
-import { AgentuityClient } from '../services/agentuityClient';
+// import { AgentuityClient } from '../services/agentuityClient';
 
 const router = Router();
 
