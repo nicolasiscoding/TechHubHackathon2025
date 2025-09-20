@@ -1,0 +1,86 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "services": [
+    {
+      "name": "techhub-backend",
+      "rootDirectory": "./backend",
+      "build": {
+        "builder": "NIXPACKS"
+      },
+      "deploy": {
+        "startCommand": "npm start",
+        "healthcheckPath": "/health",
+        "healthcheckTimeout": 300,
+        "numReplicas": 1,
+        "sleepApplication": false,
+        "restartPolicyType": "ON_FAILURE",
+        "restartPolicyMaxRetries": 10
+      },
+      "environment": {
+        "NODE_ENV": "production",
+        "PORT": "${{RAILWAY_PORT}}"
+      }
+    },
+    {
+      "name": "techhub-frontend",
+      "rootDirectory": "./reactapp",
+      "build": {
+        "builder": "NIXPACKS"
+      },
+      "deploy": {
+        "startCommand": "npm start",
+        "numReplicas": 1,
+        "sleepApplication": false,
+        "restartPolicyType": "ON_FAILURE",
+        "restartPolicyMaxRetries": 5
+      },
+      "environment": {
+        "NODE_ENV": "production",
+        "PORT": "${{RAILWAY_PORT}}",
+        "NEXT_PUBLIC_API_URL": "${{techhub-backend.RAILWAY_PUBLIC_DOMAIN}}"
+      }
+    },
+    {
+      "name": "valhalla-routing",
+      "rootDirectory": "./valhalla-docker",
+      "build": {
+        "builder": "DOCKERFILE",
+        "dockerfilePath": "Dockerfile",
+        "watchPatterns": [
+          "valhalla-docker/Dockerfile",
+          "valhalla-docker/config/**/*",
+          "valhalla-docker/custom_files/**/*"
+        ]
+      },
+      "deploy": {
+        "healthcheckPath": "/status",
+        "healthcheckTimeout": 300,
+        "numReplicas": 1,
+        "sleepApplication": false,
+        "restartPolicyType": "ON_FAILURE",
+        "restartPolicyMaxRetries": 3
+      },
+      "environment": {
+        "TZ": "America/New_York",
+        "tile_files": "/custom_files/osm_data/florida-latest.osm.pbf",
+        "build_tiles": "True",
+        "verbose": "True",
+        "PORT": "8002"
+      },
+      "volumes": [
+        {
+          "name": "valhalla-tiles",
+          "mountPath": "/custom_files/valhalla_tiles"
+        },
+        {
+          "name": "valhalla-osm-data",
+          "mountPath": "/custom_files/osm_data"
+        },
+        {
+          "name": "valhalla-admin-data",
+          "mountPath": "/custom_files/admin_data"
+        }
+      ]
+    }
+  ]
+}

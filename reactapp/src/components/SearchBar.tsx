@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
-import { Search, Navigation, Menu, X, MapPin, Clock, MoreVertical, Car, Bike, Users, AlertTriangle } from "lucide-react"
+import { useState, useRef } from "react"
+import { Search, Navigation, Menu, X, MapPin, Clock, MoreVertical, Car, Bike, Users } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { motion, AnimatePresence } from "framer-motion"
@@ -30,7 +30,7 @@ interface SearchBarProps {
   userLocation?: { lat: number; lng: number }
 }
 
-export default function SearchBar({ onSearch, onNavigate, onMenuClick, onRouteCalculated, userLocation }: SearchBarProps) {
+export default function SearchBar({ onSearch, onNavigate, onRouteCalculated, userLocation }: SearchBarProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [isSearchFocused, setIsSearchFocused] = useState(false)
   const [transportMode, setTransportMode] = useState<'auto' | 'bicycle' | 'pedestrian'>('auto')
@@ -102,11 +102,12 @@ export default function SearchBar({ onSearch, onNavigate, onMenuClick, onRouteCa
 
       setSearchQuery("")
       searchRef.current?.blur()
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Route calculation failed:', error)
 
       // Show user-friendly error message
-      if (error.message?.includes('503') || error.message?.includes('unavailable')) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      if (errorMessage.includes('503') || errorMessage.includes('unavailable')) {
         alert('⚠️ The routing service is temporarily unavailable due to high load. Please try again in a few moments.')
       } else {
         alert(`❌ Route calculation failed. Please try again later.`)

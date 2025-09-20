@@ -15,15 +15,36 @@ interface Incident {
   reportedBy?: string
 }
 
+interface RouteSummary {
+  distance_miles: number
+  duration_minutes: number
+}
+
+interface RouteDirection {
+  instruction: string
+  distance: number
+  time: number
+}
+
+interface ExclusionUsed {
+  lat: number
+  lng: number
+  radius: number
+}
+
 interface RouteResponse {
   optimal_route: {
-    summary: any
-    directions: any[]
+    summary: RouteSummary
+    directions: RouteDirection[]
     geometry: string
   }
-  baseline_route?: any
+  baseline_route?: {
+    summary: RouteSummary
+    directions: RouteDirection[]
+    geometry: string
+  }
   avoided_incidents: number
-  exclusions_used: any[]
+  exclusions_used: ExclusionUsed[]
   calculation_time_ms: number
 }
 
@@ -87,14 +108,14 @@ const decodePolyline = (encoded: string): [number, number][] => {
 }
 
 export default function BeautifulMapView({ incidents, userLocation, currentRoute }: BeautifulMapViewProps) {
-  const mapRef = useRef<any>(null)
+  const mapRef = useRef<Map | null>(null)
   const [viewState, setViewState] = useState({
     longitude: -74.0060,
     latitude: 40.7128,
     zoom: 12,
   })
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null)
-  const [routeGeometry, setRouteGeometry] = useState<any>(null)
+  const [routeGeometry, setRouteGeometry] = useState<GeoJSON.Feature<GeoJSON.LineString> | null>(null)
   const [mapLoaded, setMapLoaded] = useState(false)
 
   useEffect(() => {

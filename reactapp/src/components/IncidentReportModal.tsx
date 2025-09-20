@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Plus, Zap, Fuel, ShoppingCart, TreePine, MapPin, Home, Check, AlertTriangle } from "lucide-react"
+import { Plus, Zap, Fuel, ShoppingCart, TreePine, MapPin, Home, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { motion, AnimatePresence } from "framer-motion"
 import {
@@ -10,7 +10,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"

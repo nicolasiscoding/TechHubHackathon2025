@@ -90,10 +90,10 @@ export const incidentAPI = {
 
     const incidents = await response.json()
     // Convert timestamp strings back to Date objects
-    return incidents.map((incident: any) => ({
+    return incidents.map((incident: Record<string, unknown>) => ({
       ...incident,
-      timestamp: new Date(incident.timestamp)
-    }))
+      timestamp: new Date(incident.timestamp as string)
+    }) as Incident)
   }
 }
 
