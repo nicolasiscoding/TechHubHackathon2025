@@ -90,7 +90,7 @@ export default function BeautifulMapView({ incidents, userLocation }: BeautifulM
           </div>
 
           {/* Badge for recent incidents */}
-          {Date.now() - incident.timestamp.getTime() < 30 * 60 * 1000 && (
+          {Date.now() - new Date(incident.timestamp).getTime() < 30 * 60 * 1000 && (
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}

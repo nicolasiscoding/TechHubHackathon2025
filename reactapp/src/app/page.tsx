@@ -5,6 +5,7 @@ import dynamic from "next/dynamic"
 import SearchBar from "@/components/SearchBar"
 import IncidentReportModal from "@/components/IncidentReportModal"
 import { ThemeToggle } from "@/components/ThemeToggle"
+import { incidentAPI, Incident } from "@/lib/api"
 
 // Dynamic import for Beautiful MapView to avoid SSR issues
 const BeautifulMapView = dynamic(() => import("@/components/BeautifulMapView"), {
@@ -19,15 +20,6 @@ const BeautifulMapView = dynamic(() => import("@/components/BeautifulMapView"), 
   ),
 })
 
-interface Incident {
-  id: string
-  lat: number
-  lng: number
-  type: "food_available" | "gas_available" | "power_available" | "shelter_available" | "debris_road" | "downed_powerline"
-  description: string
-  timestamp: Date
-  reportedBy?: string
-}
 
 export default function Home() {
   const [incidents, setIncidents] = useState<Incident[]>([])
@@ -54,68 +46,19 @@ export default function Home() {
       setIsLoading(false)
     }
 
-    // Load sample incidents (in a real app, this would come from an API)
-    const sampleIncidents: Incident[] = [
-      // Positive Resources
-      {
-        id: "1",
-        lat: 40.7200,
-        lng: -74.0060,
-        type: "food_available",
-        description: "Community center has hot meals 8am-6pm. Free for all. Volunteers needed!",
-        timestamp: new Date(),
-        reportedBy: "CommunityVol"
-      },
-      {
-        id: "2",
-        lat: 40.7150,
-        lng: -74.0100,
-        type: "power_available",
-        description: "Public library has power and wifi. Phone charging station set up.",
-        timestamp: new Date(),
-        reportedBy: "LibraryStaff"
-      },
-      {
-        id: "3",
-        lat: 40.7100,
-        lng: -74.0020,
-        type: "gas_available",
-        description: "Shell station on Main St has gas. $3.89/gal. No limit per customer.",
-        timestamp: new Date(),
-        reportedBy: "LocalResident"
-      },
-      {
-        id: "4",
-        lat: 40.7250,
-        lng: -74.0080,
-        type: "shelter_available",
-        description: "High school gym open as emergency shelter. Cots and blankets available.",
-        timestamp: new Date(),
-        reportedBy: "EmergencyCoord"
-      },
-
-      // Negative Hazards
-      {
-        id: "5",
-        lat: 40.7080,
-        lng: -74.0040,
-        type: "debris_road",
-        description: "Large tree blocking Oak Ave between 1st and 2nd St. Detour via Pine St.",
-        timestamp: new Date(),
-        reportedBy: "FirstResponder"
-      },
-      {
-        id: "6",
-        lat: 40.7300,
-        lng: -74.0120,
-        type: "downed_powerline",
-        description: "Live power line down on Elm Street. STAY AWAY! Crews en route.",
-        timestamp: new Date(),
-        reportedBy: "UtilityCrew"
-      }
-    ]
-    setIncidents(sampleIncidents)
+    // Load incidents from backend API
+    loadIncidents()
   }, [])
+
+  const loadIncidents = async () => {
+    try {
+      const fetchedIncidents = await incidentAPI.getIncidents()
+      setIncidents(fetchedIncidents)
+    } catch (error) {
+      console.error("Failed to load incidents:", error)
+      // Keep using sample data as fallback for now
+    }
+  }
 
   const handleSearch = (query: string) => {
     console.log("Searching for:", query)
@@ -129,23 +72,26 @@ export default function Home() {
     // This would typically calculate a route and display it on the map
   }
 
-  const handleReportIncident = (incidentData: {
+  const handleReportIncident = async (incidentData: {
     type: string
     description: string
     location?: { lat: number; lng: number }
   }) => {
-    const newIncident: Incident = {
-      id: Date.now().toString(),
-      lat: incidentData.location?.lat || userLocation?.lat || 40.7128,
-      lng: incidentData.location?.lng || userLocation?.lng || -74.0060,
-      type: incidentData.type as Incident["type"],
-      description: incidentData.description,
-      timestamp: new Date(),
-      reportedBy: "CurrentUser"
-    }
+    try {
+      // Send incident to backend API
+      const newIncident = await incidentAPI.createIncident({
+        type: incidentData.type,
+        description: incidentData.description,
+        location: incidentData.location || userLocation
+      })
 
-    setIncidents(prev => [...prev, newIncident])
-    console.log("New incident reported:", newIncident)
+      // Add to local state for immediate UI update
+      setIncidents(prev => [...prev, newIncident])
+      console.log("New incident reported:", newIncident)
+    } catch (error) {
+      console.error("Failed to report incident:", error)
+      alert("Failed to report incident. Please try again.")
+    }
   }
 
   return (
