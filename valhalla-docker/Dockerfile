@@ -1,25 +1,25 @@
 # Use the official Valhalla Docker image
 FROM ghcr.io/gis-ops/docker-valhalla/valhalla:latest
 
-# Set working directory
-WORKDIR /custom_files
+# Set proper working directory
+WORKDIR /app
+
+# Create directories
+RUN mkdir -p /app/valhalla_tiles \
+    && mkdir -p /app/osm_data \
+    && mkdir -p /app/admin_data \
+    && mkdir -p /app/config
 
 # Copy configuration files
-COPY config/valhalla.json /custom_files/config/valhalla.json
-COPY custom_files/valhalla.json /custom_files/valhalla.json
+COPY config/valhalla.json /app/config/valhalla.json
 
-# Create necessary directories
-RUN mkdir -p /custom_files/valhalla_tiles \
-    && mkdir -p /custom_files/osm_data \
-    && mkdir -p /custom_files/admin_data
+# Download Florida OSM data during build using curl (Railway-friendly approach)
+# This ensures data is available without requiring git-lfs
+RUN curl -L -o /app/osm_data/florida-latest.osm.pbf \
+    https://download.geofabrik.de/north-america/us/florida-latest.osm.pbf
 
-# Download Florida OSM data at build time (for production)
-# Note: This will increase build time but ensure data is available
-RUN wget -q https://download.geofabrik.de/north-america/us/florida-latest.osm.pbf \
-    -O /custom_files/osm_data/florida-latest.osm.pbf
-
-# Set environment variables
-ENV tile_files=/custom_files/osm_data/florida-latest.osm.pbf \
+# Set environment variables with updated paths
+ENV tile_files=/app/osm_data/florida-latest.osm.pbf \
     build_tiles=True \
     verbose=True \
     TZ=America/New_York
