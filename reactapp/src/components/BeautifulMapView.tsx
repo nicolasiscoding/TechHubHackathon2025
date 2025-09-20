@@ -1,9 +1,10 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import Map, { Marker, Popup, NavigationControl, GeolocateControl, Source, Layer } from "react-map-gl/maplibre"
+import MapGL, { Marker, Popup, NavigationControl, GeolocateControl, Source, Layer } from "react-map-gl/maplibre"
 import { motion, AnimatePresence } from "framer-motion"
 import "maplibre-gl/dist/maplibre-gl.css"
+import type { RouteResponse } from "@/lib/api"
 
 interface Incident {
   id: string
@@ -15,38 +16,6 @@ interface Incident {
   reportedBy?: string
 }
 
-interface RouteSummary {
-  distance_miles: number
-  duration_minutes: number
-}
-
-interface RouteDirection {
-  instruction: string
-  distance: number
-  time: number
-}
-
-interface ExclusionUsed {
-  lat: number
-  lng: number
-  radius: number
-}
-
-interface RouteResponse {
-  optimal_route: {
-    summary: RouteSummary
-    directions: RouteDirection[]
-    geometry: string
-  }
-  baseline_route?: {
-    summary: RouteSummary
-    directions: RouteDirection[]
-    geometry: string
-  }
-  avoided_incidents: number
-  exclusions_used: ExclusionUsed[]
-  calculation_time_ms: number
-}
 
 interface BeautifulMapViewProps {
   incidents: Incident[]
@@ -108,7 +77,7 @@ const decodePolyline = (encoded: string): [number, number][] => {
 }
 
 export default function BeautifulMapView({ incidents, userLocation, currentRoute }: BeautifulMapViewProps) {
-  const mapRef = useRef<Map | null>(null)
+  const mapRef = useRef<React.ComponentRef<typeof MapGL>>(null)
   const [viewState, setViewState] = useState({
     longitude: -74.0060,
     latitude: 40.7128,
@@ -143,11 +112,11 @@ export default function BeautifulMapView({ incidents, userLocation, currentRoute
       const coordinates = decodePolyline(currentRoute.optimal_route.geometry)
 
       // Create GeoJSON for the route
-      const routeGeoJSON = {
-        type: 'Feature',
+      const routeGeoJSON: GeoJSON.Feature<GeoJSON.LineString> = {
+        type: 'Feature' as const,
         properties: {},
         geometry: {
-          type: 'LineString',
+          type: 'LineString' as const,
           coordinates: coordinates
         }
       }
@@ -266,7 +235,7 @@ export default function BeautifulMapView({ incidents, userLocation, currentRoute
 
   return (
     <div className="absolute inset-0 overflow-hidden">
-      <Map
+      <MapGL
         ref={mapRef}
         {...viewState}
         onMove={(evt) => setViewState(evt.viewState)}
@@ -363,7 +332,7 @@ export default function BeautifulMapView({ incidents, userLocation, currentRoute
             </motion.div>
           </Popup>
         )}
-      </Map>
+      </MapGL>
 
       {/* Loading overlay */}
       <AnimatePresence>
