@@ -18,5 +18,5 @@ NODE_ENV = "production"
 PORT = "${{PORT}}"
 FRONTEND_URL = "https://${{RAILWAY_PUBLIC_DOMAIN}}"
 VALHALLA_URL = "https://valhalla1.openstreetmap.de"
-# For local Valhalla deployment (future):
-# VALHALLA_URL = "http://${{valhalla.RAILWAY_PRIVATE_DOMAIN}}:8002"
+# For local Valhalla deployment:
+# VALHALLA_URL = "http://${{vahalla.RAILWAY_PRIVATE_DOMAIN}}:8002"

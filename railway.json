@@ -41,7 +41,7 @@
       }
     },
     {
-      "name": "valhalla-routing",
+      "name": "vahalla",
       "rootDirectory": "./valhalla-docker",
       "build": {
         "builder": "DOCKERFILE",
