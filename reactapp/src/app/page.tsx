@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import dynamic from "next/dynamic"
 import SearchBar from "@/components/SearchBar"
 import IncidentReportModal from "@/components/IncidentReportModal"
+import ChatBot from "@/components/ChatBot"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import { incidentAPI, Incident, RouteResponse } from "@/lib/api"
 
@@ -27,6 +28,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true)
   const [currentRoute, setCurrentRoute] = useState<RouteResponse | null>(null)
   const [isReportModalOpen, setIsReportModalOpen] = useState(false)
+  const [isChatBotOpen, setIsChatBotOpen] = useState(false)
 
   useEffect(() => {
     // Get user's current location
@@ -125,6 +127,13 @@ export default function Home() {
         onSubmit={handleIncidentSubmit}
         onOpenModal={() => setIsReportModalOpen(true)}
         currentLocation={userLocation}
+      />
+
+      {/* ChatBot */}
+      <ChatBot
+        isOpen={isChatBotOpen}
+        onClose={() => setIsChatBotOpen(false)}
+        onOpenModal={() => setIsChatBotOpen(true)}
       />
 
       {/* Loading overlay */}

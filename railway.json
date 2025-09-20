@@ -62,7 +62,7 @@
       },
       "environment": {
         "TZ": "America/New_York",
-        "tile_files": "/app/osm_data/florida-latest.osm.pbf",
+        "tile_files": "/custom_files/osm_data/florida-latest.osm.pbf",
         "build_tiles": "True",
         "verbose": "True",
         "PORT": "8002"
@@ -70,15 +70,15 @@
       "volumes": [
         {
           "name": "valhalla-tiles",
-          "mountPath": "/app/valhalla_tiles"
+          "mountPath": "/custom_files/valhalla_tiles"
         },
         {
           "name": "valhalla-osm-data",
-          "mountPath": "/app/osm_data"
+          "mountPath": "/custom_files/osm_data"
         },
         {
           "name": "valhalla-admin-data",
-          "mountPath": "/app/admin_data"
+          "mountPath": "/custom_files/admin_data"
         }
       ]
     }
