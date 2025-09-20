@@ -13,10 +13,13 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@agentuity/sdk": "^0.0.1",
     "cors": "^2.8.5",
+    "dotenv": "^17.2.2",
     "express": "^5.1.0",
     "helmet": "^8.1.0",
     "morgan": "^1.10.1",
+    "ngeohash": "^0.6.3",
     "uuid": "^13.0.0"
   },
   "devDependencies": {

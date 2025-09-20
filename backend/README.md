@@ -57,8 +57,35 @@ Copy `.env.example` to `.env` and configure:
 - `PORT=3001`
 - `FRONTEND_URL=http://localhost:3000`
 
-## Future Integration
+## Spatial Storage Integration
 
-- Replace in-memory storage with Agenuity SDK
-- Add geospatial distance queries for route optimization
+### Agentuity + Geohashing
+- **Hybrid Storage**: Agentuity KV + in-memory fallback
+- **Spatial Indexing**: Geohash-based keys for efficient location queries
+- **Route Optimization**: Distance-based exclusion filtering
+
+### Enhanced Exclusions Endpoint
+```http
+GET /api/incidents/exclusions?startLat=40.7&startLng=-74&endLat=40.8&endLng=-73.9&buffer=2
+```
+Returns only incidents within 2km buffer of the route for optimal Valhalla performance.
+
+### Environment Setup
+Add to `.env`:
+```
+AGENTUITY_API_KEY=your_api_key_here
+```
+
+## Geospatial Features
+
+- **8-digit geohash precision** (~38m accuracy)
+- **Bounding box queries** for route-specific incidents
+- **Distance filtering** within specified radius
+- **Automatic deduplication** of overlapping areas
+- **TTL cleanup** for old incidents
+
+## Future Enhancements
+
 - WebSocket support for real-time updates
+- Incident clustering for high-density areas
+- Machine learning for incident prediction
