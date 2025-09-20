@@ -6,24 +6,74 @@ import { AgentuityClient } from '../services/agentuityClient';
 
 const router = Router();
 
-// Initialize Agentuity client
-const agentuityApiKey = process.env.AGENTUITY_API_KEY;
-let agentuityClient: AgentuityClient | null = null;
+// Initialize Agentuity client - COMMENTED OUT FOR DEMO
+// const agentuityApiKey = process.env.AGENTUITY_API_KEY;
+// let agentuityClient: AgentuityClient | null = null;
 
-if (agentuityApiKey) {
-  try {
-    agentuityClient = new AgentuityClient(agentuityApiKey);
-    console.log('✅ Agentuity client initialized');
-  } catch (error) {
-    console.error('❌ Failed to initialize Agentuity client:', error);
-    console.log('⚠️  Falling back to in-memory storage');
+// if (agentuityApiKey) {
+//   try {
+//     agentuityClient = new AgentuityClient(agentuityApiKey);
+//     console.log('✅ Agentuity client initialized');
+//   } catch (error) {
+//     console.error('❌ Failed to initialize Agentuity client:', error);
+//     console.log('⚠️  Falling back to in-memory storage');
+//   }
+// } else {
+//   console.log('⚠️  No AGENTUITY_API_KEY found, using in-memory storage');
+// }
+
+console.log('🚧 Demo Mode: Using seeded in-memory storage');
+
+// In-memory storage with demo incidents
+const incidents: Incident[] = [
+  // Demo incidents along Miami -> West Palm Beach route
+  {
+    id: 'demo-debris-1',
+    lat: 26.1224,
+    lng: -80.1373,
+    type: 'debris_road',
+    description: 'Large tree blocking I-95 northbound near Fort Lauderdale',
+    timestamp: new Date(),
+    reportedBy: 'Highway Patrol'
+  },
+  {
+    id: 'demo-debris-2',
+    lat: 26.3683,
+    lng: -80.1289,
+    type: 'debris_road',
+    description: 'Construction debris blocking right lane on I-95 near Boca Raton',
+    timestamp: new Date(),
+    reportedBy: 'DOT Crew'
+  },
+  {
+    id: 'demo-powerline-1',
+    lat: 26.5012,
+    lng: -80.0956,
+    type: 'downed_powerline',
+    description: 'Live power line down across Yamato Road - EXTREMELY DANGEROUS',
+    timestamp: new Date(),
+    reportedBy: 'FPL Emergency'
+  },
+  // Some positive resources too
+  {
+    id: 'demo-food-1',
+    lat: 26.2341,
+    lng: -80.1145,
+    type: 'food_available',
+    description: 'Red Cross emergency food distribution at Pompano Beach Community Center',
+    timestamp: new Date(),
+    reportedBy: 'Red Cross Volunteer'
+  },
+  {
+    id: 'demo-gas-1',
+    lat: 25.9012,
+    lng: -80.1534,
+    type: 'gas_available',
+    description: 'Shell station on Federal Highway has fuel - no wait time',
+    timestamp: new Date(),
+    reportedBy: 'Local Resident'
   }
-} else {
-  console.log('⚠️  No AGENTUITY_API_KEY found, using in-memory storage');
-}
-
-// In-memory storage fallback
-const incidents: Incident[] = [];
+];
 
 /**
  * POST /api/incidents
@@ -51,25 +101,22 @@ router.post('/', async (req: Request<{}, Incident, IncidentRequest>, res: Respon
       reportedBy: 'Anonymous' // For now
     };
 
-    // Store incident with Agentuity + fallback
-    try {
-      if (agentuityClient) {
-        await agentuityClient.storeIncident(incident);
-      }
+    // Store incident in memory for demo
+    const geohash = SpatialStorage.generateGeohashKey(incident.lat, incident.lng);
+    incidents.push({ ...incident, geohash } as any);
 
-      // Always store in memory as cache/fallback
-      const geohash = SpatialStorage.generateGeohashKey(incident.lat, incident.lng);
-      incidents.push({ ...incident, geohash } as any);
+    console.log(`📍 New incident reported: ${type} at [${incident.lat}, ${incident.lng}]`);
+    console.log(`🗺️ Total incidents in memory: ${incidents.length}`);
+    res.status(201).json(incident);
 
-      console.log(`New incident reported: ${type} at [${incident.lat}, ${incident.lng}]`);
-      res.status(201).json(incident);
-    } catch (storageError) {
-      console.error('Storage error:', storageError);
-      // Still store in memory if Agentuity fails
-      const geohash = SpatialStorage.generateGeohashKey(incident.lat, incident.lng);
-      incidents.push({ ...incident, geohash } as any);
-      res.status(201).json(incident);
-    }
+    // Agentuity storage commented out for demo
+    // try {
+    //   if (agentuityClient) {
+    //     await agentuityClient.storeIncident(incident);
+    //   }
+    // } catch (storageError) {
+    //   console.error('Storage error:', storageError);
+    // }
   } catch (error) {
     console.error('Error creating incident:', error);
     res.status(500).json({ error: 'Internal server error' } as any);
@@ -99,63 +146,36 @@ router.get('/exclusions', async (req: Request, res: Response<ValhallaExclusionRe
       // Use spatial filtering for route-specific exclusions
       const bufferKm = buffer ? parseFloat(buffer as string) : 2;
 
-      try {
-        if (agentuityClient) {
-          // Use Agentuity for spatial query
-          relevantIncidents = await agentuityClient.getExclusionsForRoute(
-            parseFloat(startLat as string),
-            parseFloat(startLng as string),
-            parseFloat(endLat as string),
-            parseFloat(endLng as string),
-            bufferKm
-          );
-        } else {
-          // Fallback to in-memory spatial filtering
-          const bounds = SpatialStorage.calculateRouteBounds(
-            parseFloat(startLat as string),
-            parseFloat(startLng as string),
-            parseFloat(endLat as string),
-            parseFloat(endLng as string),
-            bufferKm
-          );
+      // Use in-memory spatial filtering for demo
+      const bounds = SpatialStorage.calculateRouteBounds(
+        parseFloat(startLat as string),
+        parseFloat(startLng as string),
+        parseFloat(endLat as string),
+        parseFloat(endLng as string),
+        bufferKm
+      );
 
-          relevantIncidents = incidents.filter(incident => {
-            const withinBounds = incident.lat >= bounds.south &&
-                               incident.lat <= bounds.north &&
-                               incident.lng >= bounds.west &&
-                               incident.lng <= bounds.east;
+      relevantIncidents = incidents.filter(incident => {
+        const withinBounds = incident.lat >= bounds.south &&
+                           incident.lat <= bounds.north &&
+                           incident.lng >= bounds.west &&
+                           incident.lng <= bounds.east;
 
-            const isNegative = incident.type === 'debris_road' || incident.type === 'downed_powerline';
-            const hoursAgo = (Date.now() - incident.timestamp.getTime()) / (1000 * 60 * 60);
-            const isRecent = hoursAgo <= 24;
+        const isNegative = incident.type === 'debris_road' || incident.type === 'downed_powerline';
+        const hoursAgo = (Date.now() - incident.timestamp.getTime()) / (1000 * 60 * 60);
+        const isRecent = hoursAgo <= 24;
 
-            return withinBounds && isNegative && isRecent;
-          });
-        }
-      } catch (agentuityError) {
-        console.error('Agentuity query failed, falling back to in-memory:', agentuityError);
-        // Fallback to in-memory spatial filtering
-        const bounds = SpatialStorage.calculateRouteBounds(
-          parseFloat(startLat as string),
-          parseFloat(startLng as string),
-          parseFloat(endLat as string),
-          parseFloat(endLng as string),
-          bufferKm
-        );
+        return withinBounds && isNegative && isRecent;
+      });
 
-        relevantIncidents = incidents.filter(incident => {
-          const withinBounds = incident.lat >= bounds.south &&
-                             incident.lat <= bounds.north &&
-                             incident.lng >= bounds.west &&
-                             incident.lng <= bounds.east;
-
-          const isNegative = incident.type === 'debris_road' || incident.type === 'downed_powerline';
-          const hoursAgo = (Date.now() - incident.timestamp.getTime()) / (1000 * 60 * 60);
-          const isRecent = hoursAgo <= 24;
-
-          return withinBounds && isNegative && isRecent;
-        });
-      }
+      // Agentuity query commented out for demo
+      // try {
+      //   if (agentuityClient) {
+      //     relevantIncidents = await agentuityClient.getExclusionsForRoute(...);
+      //   }
+      // } catch (agentuityError) {
+      //   console.error('Agentuity query failed:', agentuityError);
+      // }
 
       console.log(`Found ${relevantIncidents.length} incidents within ${bufferKm}km of route`);
     } else {

@@ -15,9 +15,22 @@ interface Incident {
   reportedBy?: string
 }
 
+interface RouteResponse {
+  optimal_route: {
+    summary: any
+    directions: any[]
+    geometry: string
+  }
+  baseline_route?: any
+  avoided_incidents: number
+  exclusions_used: any[]
+  calculation_time_ms: number
+}
+
 interface BeautifulMapViewProps {
   incidents: Incident[]
   userLocation?: { lat: number; lng: number }
+  currentRoute?: RouteResponse | null
 }
 
 const incidentConfig = {
@@ -32,7 +45,7 @@ const incidentConfig = {
   downed_powerline: { color: "#ea580c", icon: "⚠️", label: "Downed Powerline" },
 }
 
-export default function BeautifulMapView({ incidents, userLocation }: BeautifulMapViewProps) {
+export default function BeautifulMapView({ incidents, userLocation, currentRoute }: BeautifulMapViewProps) {
   const mapRef = useRef<any>(null)
   const [viewState, setViewState] = useState({
     longitude: -74.0060,
@@ -52,6 +65,29 @@ export default function BeautifulMapView({ incidents, userLocation }: BeautifulM
       }))
     }
   }, [userLocation])
+
+  // Handle route visualization
+  useEffect(() => {
+    if (currentRoute) {
+      console.log('🗺️ Route received in map component:', currentRoute)
+      console.log('📍 Route summary:', {
+        distance: `${currentRoute.optimal_route.summary.distance_miles} miles`,
+        duration: `${currentRoute.optimal_route.summary.duration_minutes} minutes`,
+        avoided_incidents: currentRoute.avoided_incidents
+      })
+
+      // TODO: Add polyline visualization to map
+      // The geometry is encoded polyline format that needs to be decoded
+      if (currentRoute.optimal_route.geometry) {
+        console.log('🛣️ Route geometry available (encoded polyline)')
+      }
+
+      if (currentRoute.avoided_incidents > 0) {
+        console.log(`🚧 Successfully avoided ${currentRoute.avoided_incidents} incidents!`)
+        console.log('📍 Excluded locations:', currentRoute.exclusions_used)
+      }
+    }
+  }, [currentRoute])
 
   const IncidentMarker = ({ incident }: { incident: Incident }) => {
     const config = incidentConfig[incident.type]

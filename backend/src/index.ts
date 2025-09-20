@@ -4,6 +4,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import incidentsRouter from './routes/incidents';
+import routesRouter from './routes/routes';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -29,6 +30,7 @@ app.get('/health', (req, res) => {
 
 // API routes
 app.use('/api/incidents', incidentsRouter);
+app.use('/api/routes', routesRouter);
 
 // 404 handler
 app.use((req, res) => {
@@ -49,6 +51,8 @@ app.listen(PORT, () => {
   console.log(`  POST http://localhost:${PORT}/api/incidents - Create incident`);
   console.log(`  GET  http://localhost:${PORT}/api/incidents - Get all incidents`);
   console.log(`  GET  http://localhost:${PORT}/api/incidents/exclusions - Get Valhalla exclusions`);
+  console.log(`  POST http://localhost:${PORT}/api/routes - Calculate route with incident avoidance`);
+  console.log(`  GET  http://localhost:${PORT}/api/routes/test - Test Valhalla routing`);
 });
 
 export default app;

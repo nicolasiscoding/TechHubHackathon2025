@@ -39,34 +39,49 @@ export class AgentuityClient {
   }
 
   /**
-   * Store incident in vector store following production API format
+   * Store incident in vector store with optimized embedding content
    */
   async storeIncident(incident: Incident): Promise<void> {
     try {
       const geohashKey = SpatialStorage.generateGeohashKey(incident.lat, incident.lng);
       const storageKey = `incident:${geohashKey}:${incident.id}`;
 
+      // Create embeddable content: description + location context + keywords
+      const locationKeywords = await this.generateLocationKeywords(incident.lat, incident.lng);
+      const typeKeywords = this.getIncidentTypeKeywords(incident.type);
+
+      const embeddableContent = [
+        incident.description,
+        `Location: ${incident.lat.toFixed(4)}, ${incident.lng.toFixed(4)}`,
+        `Type: ${incident.type.replace('_', ' ')}`,
+        `Keywords: ${typeKeywords.join(', ')}`,
+        `Area: ${locationKeywords.join(', ')}`,
+        `Reported: ${new Date(incident.timestamp).toLocaleDateString()}`
+      ].join(' | ');
+
       // Format data as array of objects matching production API
       const vectorData = [{
         name: this.vectorStoreName,
         key: storageKey,
-        document: JSON.stringify({
-          ...incident,
-          geohash: geohashKey,
-          storedAt: new Date().toISOString()
-        }),
+        document: embeddableContent, // Embed meaningful content, not raw JSON
         metadata: {
+          // Store full incident data in metadata for retrieval
+          incident_id: incident.id,
           type: incident.type,
           lat: incident.lat,
           lng: incident.lng,
+          description: incident.description,
+          timestamp: incident.timestamp,
+          reported_by: incident.reportedBy || 'Anonymous',
           geohash: geohashKey,
-          timestamp: incident.timestamp
+          stored_at: new Date().toISOString()
         }
       }];
 
       await this.makeRequest('PUT', `/sdk/vector/${this.vectorStoreName}`, vectorData);
 
       console.log(`✅ Stored in Agentuity vector store: ${storageKey}`);
+      console.log(`📄 Embedded content: ${embeddableContent.substring(0, 100)}...`);
     } catch (error) {
       console.error('Error storing incident in Agentuity:', error);
       throw error;
@@ -74,28 +89,95 @@ export class AgentuityClient {
   }
 
   /**
-   * Get incidents within bounding box using metadata filtering
+   * Generate location-based keywords for better semantic search
+   */
+  private async generateLocationKeywords(lat: number, lng: number): Promise<string[]> {
+    const keywords: string[] = [];
+
+    // Add coordinate-based keywords
+    keywords.push(`lat_${Math.floor(lat * 100) / 100}`);
+    keywords.push(`lng_${Math.floor(lng * 100) / 100}`);
+
+    // Add rough geographic areas (could be enhanced with reverse geocoding)
+    if (lat >= 25.7 && lat <= 26.8 && lng >= -80.3 && lng <= -80.0) {
+      keywords.push('South Florida', 'Miami-Dade', 'Broward', 'Palm Beach');
+
+      if (lat >= 25.7 && lat <= 25.8) {
+        keywords.push('Miami', 'Downtown Miami', 'Brickell');
+      } else if (lat >= 26.0 && lat <= 26.2) {
+        keywords.push('Fort Lauderdale', 'Broward County');
+      } else if (lat >= 26.3 && lat <= 26.4) {
+        keywords.push('Boca Raton', 'Delray Beach');
+      } else if (lat >= 26.7 && lat <= 26.8) {
+        keywords.push('West Palm Beach', 'Palm Beach County');
+      }
+
+      // Add highway/road keywords based on coordinates
+      if (lng >= -80.15 && lng <= -80.10) {
+        keywords.push('I-95', 'Interstate 95', 'US-1');
+      }
+    }
+
+    return keywords;
+  }
+
+  /**
+   * Get searchable keywords for incident types
+   */
+  private getIncidentTypeKeywords(type: string): string[] {
+    const typeMap: Record<string, string[]> = {
+      'food_available': ['food', 'meals', 'restaurant', 'grocery', 'supplies', 'available', 'open'],
+      'gas_available': ['gas', 'fuel', 'gasoline', 'station', 'available', 'open'],
+      'power_available': ['power', 'electricity', 'charging', 'wifi', 'available', 'working'],
+      'shelter_available': ['shelter', 'housing', 'refuge', 'safe', 'available', 'open'],
+      'debris_road': ['debris', 'blocked', 'road', 'tree', 'obstruction', 'hazard', 'impassable'],
+      'downed_powerline': ['powerline', 'power line', 'electrical', 'dangerous', 'hazard', 'avoid']
+    };
+
+    return typeMap[type] || [type.replace('_', ' ')];
+  }
+
+  /**
+   * Get incidents within bounding box using vector search
    */
   async getIncidentsInBounds(bounds: SpatialBounds): Promise<Incident[]> {
     try {
-      // Query vector store with metadata filters for geographic bounds
-      const response = await this.makeRequest('POST', `/sdk/vector/${this.vectorStoreName}/query`, {
-        filter: {
-          lat: { $gte: bounds.south, $lte: bounds.north },
-          lng: { $gte: bounds.west, $lte: bounds.east }
-        },
-        limit: 1000 // Get all matching incidents
+      // Use vector search endpoint to get incidents in the area
+      // Search for geographic terms that might match incidents in the bounding box
+      const searchQuery = `incidents debris road power lines hazards lat:${bounds.south}-${bounds.north} lng:${bounds.west}-${bounds.east}`;
+
+      const response = await this.makeRequest('POST', `/sdk/vector/${this.vectorStoreName}/search`, {
+        query: searchQuery,
+        limit: 1000,
+        similarity: 0.1 // Low similarity to get more results
       });
 
       // Parse incidents from vector store response
       const incidents: Incident[] = [];
-      if (response.documents) {
-        for (const doc of response.documents) {
+      if (response.results) {
+        for (const result of response.results) {
           try {
-            const incident = JSON.parse(doc.document) as Incident;
-            incidents.push(incident);
+            // Extract incident data from metadata (not from document which is now embeddable content)
+            const metadata = result.metadata;
+            if (metadata && metadata.incident_id) {
+              const incident: Incident = {
+                id: metadata.incident_id,
+                lat: metadata.lat,
+                lng: metadata.lng,
+                type: metadata.type,
+                description: metadata.description,
+                timestamp: new Date(metadata.timestamp),
+                reportedBy: metadata.reported_by
+              };
+
+              // Filter by geographic bounds since vector search might return broader results
+              if (incident.lat >= bounds.south && incident.lat <= bounds.north &&
+                  incident.lng >= bounds.west && incident.lng <= bounds.east) {
+                incidents.push(incident);
+              }
+            }
           } catch (error) {
-            console.warn('Error parsing incident document:', error);
+            console.warn('Error parsing incident from metadata:', error);
           }
         }
       }
@@ -122,26 +204,48 @@ export class AgentuityClient {
       const dayInMs = 24 * 60 * 60 * 1000;
       const recentTime = new Date(Date.now() - dayInMs).toISOString();
 
-      // Query vector store with metadata filters for route exclusions
-      const response = await this.makeRequest('POST', `/sdk/vector/${this.vectorStoreName}/query`, {
-        filter: {
-          lat: { $gte: bounds.south, $lte: bounds.north },
-          lng: { $gte: bounds.west, $lte: bounds.east },
-          type: { $in: ['debris_road', 'downed_powerline'] },
-          timestamp: { $gte: recentTime }
-        },
-        limit: 1000
+      // Query vector store using search endpoint for route hazards
+      const searchQuery = `debris road downed powerline hazards blocking route lat:${bounds.south}-${bounds.north} lng:${bounds.west}-${bounds.east}`;
+
+      const response = await this.makeRequest('POST', `/sdk/vector/${this.vectorStoreName}/search`, {
+        query: searchQuery,
+        limit: 1000,
+        similarity: 0.2 // Slightly higher similarity for more relevant hazard results
       });
 
-      // Parse incidents from vector store response
+      // Parse and filter incidents from vector store response
       const incidents: Incident[] = [];
-      if (response.documents) {
-        for (const doc of response.documents) {
+      if (response.results) {
+        for (const result of response.results) {
           try {
-            const incident = JSON.parse(doc.document) as Incident;
-            incidents.push(incident);
+            // Extract incident data from metadata
+            const metadata = result.metadata;
+            if (metadata && metadata.incident_id) {
+              const incident: Incident = {
+                id: metadata.incident_id,
+                lat: metadata.lat,
+                lng: metadata.lng,
+                type: metadata.type,
+                description: metadata.description,
+                timestamp: new Date(metadata.timestamp),
+                reportedBy: metadata.reported_by
+              };
+
+              // Filter for negative incidents (hazards) within bounds and time window
+              const isNegative = incident.type === 'debris_road' || incident.type === 'downed_powerline';
+              const withinBounds = incident.lat >= bounds.south && incident.lat <= bounds.north &&
+                                  incident.lng >= bounds.west && incident.lng <= bounds.east;
+              const incidentTime = new Date(incident.timestamp).getTime();
+              const now = Date.now();
+              const dayInMs = 24 * 60 * 60 * 1000;
+              const isRecent = (now - incidentTime) <= dayInMs;
+
+              if (isNegative && withinBounds && isRecent) {
+                incidents.push(incident);
+              }
+            }
           } catch (error) {
-            console.warn('Error parsing incident document:', error);
+            console.warn('Error parsing incident from metadata:', error);
           }
         }
       }
@@ -175,21 +279,34 @@ export class AgentuityClient {
    */
   async getAllIncidents(): Promise<Incident[]> {
     try {
-      // Query all incidents without filters
-      const response = await this.makeRequest('POST', `/sdk/vector/${this.vectorStoreName}/query`, {
-        filter: {}, // No filters = get all
-        limit: 10000
+      // Search for all incident types
+      const response = await this.makeRequest('POST', `/sdk/vector/${this.vectorStoreName}/search`, {
+        query: 'incident food gas power shelter debris powerline hazard',
+        limit: 10000,
+        similarity: 0.1 // Very low similarity to get all results
       });
 
       // Parse incidents from vector store response
       const incidents: Incident[] = [];
-      if (response.documents) {
-        for (const doc of response.documents) {
+      if (response.results) {
+        for (const result of response.results) {
           try {
-            const incident = JSON.parse(doc.document) as Incident;
-            incidents.push(incident);
+            // Extract incident data from metadata
+            const metadata = result.metadata;
+            if (metadata && metadata.incident_id) {
+              const incident: Incident = {
+                id: metadata.incident_id,
+                lat: metadata.lat,
+                lng: metadata.lng,
+                type: metadata.type,
+                description: metadata.description,
+                timestamp: new Date(metadata.timestamp),
+                reportedBy: metadata.reported_by
+              };
+              incidents.push(incident);
+            }
           } catch (error) {
-            console.warn('Error parsing incident document:', error);
+            console.warn('Error parsing incident from metadata:', error);
           }
         }
       }
