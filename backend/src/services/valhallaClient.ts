@@ -60,21 +60,35 @@ export class ValhallaClient {
   private baseUrl: string;
   private lastRequestTime: number = 0;
   private minRequestInterval: number = 1100; // 1.1 seconds to be safe
+  private isLocalServer: boolean;
 
-  constructor(baseUrl: string = 'https://valhalla1.openstreetmap.de') {
+  constructor(baseUrl: string = process.env.VALHALLA_URL || 'http://localhost:8002') {
     this.baseUrl = baseUrl;
+    this.isLocalServer = baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1');
+
+    // Local servers don't need throttling, public APIs do
+    if (this.isLocalServer) {
+      this.minRequestInterval = 0; // No throttling for local server
+      console.log('🏠 Using local Valhalla server with exclusion support');
+    } else {
+      console.log('🌐 Using public Valhalla server (limited exclusion support)');
+    }
   }
 
   /**
-   * Throttle requests to respect Valhalla's 1 call/user/sec rate limit
+   * Throttle requests to respect Valhalla's 1 call/user/sec rate limit (public APIs only)
    */
   private async throttleRequest(): Promise<void> {
+    if (this.isLocalServer) {
+      return; // No throttling needed for local server
+    }
+
     const now = Date.now();
     const timeSinceLastRequest = now - this.lastRequestTime;
 
     if (timeSinceLastRequest < this.minRequestInterval) {
       const waitTime = this.minRequestInterval - timeSinceLastRequest;
-      console.log(`⏱️ Throttling Valhalla request: waiting ${waitTime}ms`);
+      console.log(`⏱️ Throttling public Valhalla request: waiting ${waitTime}ms`);
       await new Promise(resolve => setTimeout(resolve, waitTime));
     }
 
@@ -145,7 +159,44 @@ export class ValhallaClient {
 
     // Add exclusions if any
     if (exclusions.length > 0) {
-      request.exclude = { locations: exclusions };
+      if (this.isLocalServer) {
+        // Use proper Valhalla exclude format for local server with full support
+        request.exclude = {
+          locations: exclusions.map(loc => ({
+            lat: loc.lat,
+            lon: loc.lon
+          }))
+        };
+
+        // Also add polygon exclusions for stronger avoidance
+        const excludePolygons = exclusions.map(loc => {
+          // Create a 500m radius polygon around each incident
+          const offset = 0.0045; // ~500m at this latitude
+          return {
+            type: "Polygon",
+            coordinates: [[
+              [loc.lon - offset, loc.lat - offset],
+              [loc.lon + offset, loc.lat - offset],
+              [loc.lon + offset, loc.lat + offset],
+              [loc.lon - offset, loc.lat + offset],
+              [loc.lon - offset, loc.lat - offset]
+            ]]
+          };
+        });
+
+        (request as any).exclude.polygons = excludePolygons;
+
+        console.log(`🏠 Local Valhalla: Added ${exclusions.length} exclusion points + polygons`);
+      } else {
+        // Public server - minimal exclusion attempt (likely won't work)
+        (request as any).exclude = {
+          locations: exclusions.map(loc => ({ lat: loc.lat, lon: loc.lon }))
+        };
+
+        console.log(`🌐 Public Valhalla: Added ${exclusions.length} exclusion points (limited support)`);
+      }
+
+      console.log('Exclusion coordinates:', exclusions.map(loc => `${loc.lat}, ${loc.lon}`));
     }
 
     return this.calculateRoute(request);

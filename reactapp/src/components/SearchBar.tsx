@@ -96,7 +96,7 @@ export default function SearchBar({ onSearch, onNavigate, onMenuClick, onRouteCa
       } else {
         // Try to geocode the address or fallback to regular search
         console.log(`⚠️ Address "${searchQuery}" not in demo destinations. Add geocoding for full address support.`)
-        alert(`Demo supports: Miami, Fort Lauderdale, Boca Raton, West Palm Beach, Home, Work. For "${searchQuery}", we'd need geocoding integration.`)
+        alert(`Demo supports: Miami, Fort Lauderdale, Boca Raton, Boynton Beach, West Palm Beach, Tamarac, Sunrise, Plantation, Davie, Hollywood, Aventura, City Furniture, Home, Work. For "${searchQuery}", we'd need geocoding integration.`)
         onNavigate(searchQuery)
       }
 
@@ -128,10 +128,18 @@ export default function SearchBar({ onSearch, onNavigate, onMenuClick, onRouteCa
       'palm beach': { lat: 26.7153, lon: -80.0534 },
       'fort lauderdale': { lat: 26.1224, lon: -80.1373 },
       'boca raton': { lat: 26.3683, lon: -80.1289 },
+      'boynton beach': { lat: 26.5234, lon: -80.1456 },
       'miami': { lat: 25.7617, lon: -80.1918 },
       'downtown miami': { lat: 25.7617, lon: -80.1918 },
+      'tamarac': { lat: 26.2134, lon: -80.2456 }, // City Furniture area
+      'city furniture': { lat: 26.2134, lon: -80.2456 }, // City Furniture area
+      'sunrise': { lat: 26.1567, lon: -80.2234 },
+      'plantation': { lat: 26.1489, lon: -80.2178 },
+      'davie': { lat: 26.0567, lon: -80.2089 },
+      'hollywood': { lat: 25.9912, lon: -80.1956 },
+      'aventura': { lat: 25.9345, lon: -80.1834 },
       'home': { lat: 26.7153, lon: -80.0534 }, // Default to West Palm Beach
-      'work': { lat: 26.1224, lon: -80.1373 }, // Default to Fort Lauderdale
+      'work': { lat: 26.2134, lon: -80.2456 }, // Default to Tamarac/City Furniture area
     }
 
     return destinations[normalizedQuery] || null
